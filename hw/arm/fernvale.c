@@ -191,7 +191,7 @@ static int my_sendcmd(int fd, char *buf, int len)
 static uint64_t fernvale_live_mem_read(void *opaque, hwaddr addr,
                                     unsigned size)
 {
-    uint32_t base = (uint32_t)opaque;
+    uint32_t base = (uint32_t)(intptr_t)opaque;
     uint32_t offset = base + addr;
     char cmd[128];
     uint32_t ret;
@@ -242,7 +242,7 @@ static uint64_t fernvale_live_mem_read(void *opaque, hwaddr addr,
 static void fernvale_live_mem_write(void *opaque, hwaddr addr,
                                  uint64_t val, unsigned size)
 {
-    uint32_t base = (uint32_t)opaque;
+    uint32_t base = (uint32_t)(intptr_t)opaque;
     uint32_t offset = base + addr;
     char cmd[128];
     int len;
@@ -308,7 +308,7 @@ static uint64_t fernvale_f00d_read(void *opaque, hwaddr addr,
 static void fernvale_f00d_write(void *opaque, hwaddr addr,
                                  uint64_t val, unsigned size)
 {
-    uint32_t base = (uint32_t)opaque;
+    uint32_t base = (uint32_t)(intptr_t)opaque;
     uint32_t offset = base + addr;
     uint32_t value = val;
     char cmd[128];
@@ -380,7 +380,7 @@ static void fernvale_hook_memory(uint32_t base, const char *name,
     MemoryRegion *hook = g_new(MemoryRegion, 1);
     MemoryRegion *address_space = get_system_memory();
 
-    memory_region_init_io(hook, NULL, ops, (void *)base, name, 0x10000);
+    memory_region_init_io(hook, NULL, ops, (void *)(intptr_t)base, name, 0x10000);
     memory_region_add_subregion(address_space, base, hook);
 }
 
@@ -395,7 +395,7 @@ static void fernvale_hook_f00d(uint32_t base, const char *name)
     MemoryRegion *address_space = get_system_memory();
 
     memory_region_init_rom_device(hook, NULL, &fernvale_f00d_ops,
-                (void *)base, name, 0x420000); // Up to 0xf04f0000
+                (void *)(intptr_t)base, name, 0x420000); // Up to 0xf04f0000
     memory_region_add_subregion(address_space, base, hook);
 }
 
