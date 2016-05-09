@@ -12,6 +12,8 @@
 /*
  *  ./arm-softmmu/qemu-system-arm -machine mt6262 -serial telnet:localhost:1235,server
  *
+ *  ./arm-softmmu/qemu-system-arm -machine mt6262 -s -S
+ *
  */
 
 #include "hw/sysbus.h"
@@ -373,11 +375,9 @@ static void mt6262_hook_memory(uint32_t base, const char *name,
 	memory_region_add_subregion(address_space, base, hook);
 }
 
-/*static void
- mt6262_hook_live(uint32_t base, const char *name)
- {
- mt6262_hook_memory(base, name, &mt6262_live_mem_ops, 0x10000);
- }*/
+static void mt6262_hook_live(uint32_t base, const char *name) {
+	mt6262_hook_memory(base, name, &mt6262_live_mem_ops, 0x10000);
+}
 
 /*
  static void
@@ -504,6 +504,62 @@ static void mt6262_irq_write(void *opaque, hwaddr addr, uint64_t val,
 
 static const MemoryRegionOps mt6262_irq_ops = { .read = mt6262_irq_read,
 		.write = mt6262_irq_write, .endianness = DEVICE_NATIVE_ENDIAN, };
+
+//******************************** USB *********************************
+
+static void mt6262_usb_write(void *opaque, hwaddr addr, uint64_t val,
+		unsigned size) {
+	uint32_t base = (uint32_t) (intptr_t) opaque;
+	uint32_t offset = base + addr;
+	uint32_t value = val;
+
+	switch (addr) {
+	case 0x24:
+		printf("send char           0x%08x =  0x%08x\n", offset, value);
+		break;
+
+	default:
+		printf("USB register write  0x%08x =  0x%08x\n", offset, value);
+		break;
+	}
+
+}
+
+static uint64_t mt6262_usb_read(void *opaque, hwaddr addr, unsigned size) {
+	uint32_t base = (uint32_t) (intptr_t) opaque;
+	uint32_t offset = base + addr;
+	uint32_t value;
+
+	switch (addr) {
+	case 0x0:
+		printf("usb register read  0x%08x = 0x0a\n", offset);
+		value = 0xa;
+		break;
+	case 0x2:
+		//printf(".");
+		value = 0x0;
+		break;
+	case 0x4:
+		//printf(".");
+		value = 0x0;
+		break;
+
+	case 0x13:
+		printf("usb register read  0x%08x = 0x40\n", offset);
+		value = 0x40;
+		break;
+
+	default:
+		printf("usb register read  0x%08x = 0x00\n", offset);
+		value = 0x0;
+		break;
+	}
+	return value;
+}
+
+static const MemoryRegionOps mt6262_usb_ops = { .read = mt6262_usb_read,
+		.write = mt6262_usb_write, .endianness = DEVICE_NATIVE_ENDIAN, };
+
 //******************************** Config *********************************
 
 static void mt6262_config_write(void *opaque, hwaddr addr, uint64_t val,
@@ -657,17 +713,15 @@ static void mt6262_init(QEMUMachineInitArgs *args) {
 	//int flash_size;
 	CPUClass *cc;
 
-	/*
-	 mt6262_fd = open(mt6262_DEBUG_UART, O_RDWR);
-	 if (-1 == mt6262_fd)
-	 {
-	 perror("Unable to open debug uart " mt6262_DEBUG_UART);
-	 exit(1);
-	 }
+	mt6262_fd = open(mt6262_DEBUG_UART, O_RDWR);
+	if (-1 == mt6262_fd) {
+		perror("Unable to open debug uart " mt6262_DEBUG_UART);
+		exit(1);
+	}
 
-	 sleep(2); //required to make flush work, for some reason
-	 tcflush(mt6262_fd, TCIOFLUSH);
-	 */
+	sleep(2); //required to make flush work, for some reason
+	tcflush(mt6262_fd, TCIOFLUSH);
+
 	if (!cpu_model) {
 		cpu_model = "arm926";
 	}
@@ -686,11 +740,6 @@ static void mt6262_init(QEMUMachineInitArgs *args) {
 			iram);
 	vmstate_register_ram_global(iram_region);
 	memory_region_add_subregion(address_space_mem, FV_IRAM_BASE, iram_region);
-
-	//rom = malloc(FV_ROM_SIZE);
-	//memory_region_init_ram_ptr(rom_region, NULL, "mt6262.rom", FV_ROM_SIZE, rom);
-	//vmstate_register_ram_global(rom_region);
-	//memory_region_add_subregion(address_space_mem, FV_ROM_BASE, rom_region);
 
 	psram = malloc(FV_PSRAM_SIZE);
 	memory_region_init_ram_ptr(psram_region, NULL, "mt6262.psram",
@@ -743,8 +792,11 @@ static void mt6262_init(QEMUMachineInitArgs *args) {
 		sysbus_mmio_map(SYS_BUS_DEVICE(dev), 0, FV_UART_BASE);
 	}
 
-	mt6262_hook_memory(0x80000000, "MTK6261_CONFG_BASE", &mt6262_config_ops,
+	mt6262_hook_memory(0xa0900000, "MTK6261_USB_BASE", &mt6262_usb_ops,
 			0x10000);
+	mt6262_hook_live(0x80000000, "MTK6261_CONFG_BASE");
+	//mt6262_hook_live(0xa0900000, "MTK6261_USB_BASE");
+	mt6262_hook_live(0x80200000, "MTK6261_XYZ_BASE");
 
 	//mt6262_hook_f00d(0xf00d0000, "f00d");
 
